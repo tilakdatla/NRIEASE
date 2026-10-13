@@ -1117,6 +1117,10 @@ def db_connect():
     password = os.environ.get("MYSQL_PASSWORD")
     if password is None:
         password = getpass.getpass("MySQL password (input hidden; not saved): ")
+        # Keep a prompted credential in this process so server.py's per-request
+        # API connections reuse the same password after first-run schema setup.
+        # This is runtime-only; it is never written to a file or returned.
+        os.environ["MYSQL_PASSWORD"] = password
     config = {
         "host": os.environ.get("MYSQL_HOST", "127.0.0.1"),
         "port": int(os.environ.get("MYSQL_PORT", "3306")),
