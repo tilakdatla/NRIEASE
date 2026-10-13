@@ -16,6 +16,9 @@ const services = [
 const SQUARE_YARDS_ENDPOINT = 'https://sy-mcp.squareyards.com/mcp/external';
 const MP_RERA_SEARCH_ENDPOINT = 'https://www.rera.mp.gov.in/projectsrcg-loop.php';
 const MP_RERA_ORIGIN = 'https://www.rera.mp.gov.in';
+// Keep the live Square Yards demo usable before the first city catalog import.
+// Imported database cities replace this fallback as soon as they are available.
+const FALLBACK_CITIES = ['Indore'];
 let CITIES = [];
 const MAX_RESULTS = 20;
 
@@ -603,7 +606,7 @@ function realEstate() {
   } else if (state.recommendationMode && state.recommendationError) {
     resultContent = `<div class="api-state error-state"><b>Recommendations could not be loaded.</b><p>${esc(state.recommendationError)}</p><button class="btn btn-navy" onclick="loadRecommendations()">TRY AGAIN</button></div>`;
   } else if (state.recommendationMode && !visible.length) {
-    resultContent = `<div class="api-state"><b>No ranked projects are available yet.</b><p>Make sure ${esc(state.city)} projects and their finance, guideline-rate, and infrastructure data are present in the database.</p></div>`;
+    resultContent = `<div class="api-state"><b>No evidence-ranked ${esc(state.city)} projects are available yet.</b><p>You can still browse live Square Yards listings for ${esc(state.city)}. Import project and evidence data to enable database-backed recommendations.</p><button class="btn btn-navy" onclick="toggleRecommendations()">BROWSE LIVE ${esc(state.city.toUpperCase())} PROJECTS</button></div>`;
   } else if (state.recommendationMode) {
     resultContent = `<div class="recommendation-intro"><b>Top ${esc(state.city)} properties by available evidence</b><span>Recommendations use the evidence currently available for each project.</span></div><div class="property-grid">${visible.map((project, index) => projectCard(project, { ...recommendations[index], rank: recommendations[index]?.rank || index + 1 })).join('')}</div>`;
     queueMicrotask(() => loadRecommendationImages(recommendations));
@@ -1275,12 +1278,13 @@ async function initializeCitiesAndRender() {
       throw new Error(payload?.error || `Could not load cities (${response.status}).`);
     }
     CITIES = [...new Set(payload.cities.map(city => String(city || '').trim()).filter(Boolean))];
-    if (!CITIES.length) throw new Error('No cities are in the projects table yet. Import a city project catalog first.');
+    if (!CITIES.length) CITIES = [...FALLBACK_CITIES];
     if (!CITIES.includes(state.city)) state.city = CITIES[0];
   } catch (error) {
-    CITIES = [];
-    state.city = '';
-    state.error = error.message || 'Could not load available cities.';
+    // Live listings are fetched directly from Square Yards and remain useful
+    // while the local projects table is empty or unavailable.
+    CITIES = [...FALLBACK_CITIES];
+    if (!CITIES.includes(state.city)) state.city = CITIES[0];
   }
   render();
 }
