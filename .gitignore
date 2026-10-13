@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+
+# City packages contain collected property catalogs and generated SQL.
+# Each teammate should create their own package with `init-city` or `collect-city`.
+city_onboarding/cities/*
+!city_onboarding/cities/.gitkeep
+
+# Local credentials/configuration
+.env
+.env.*
+!.env.example

@@ -16,8 +16,13 @@ const services = [
 const SQUARE_YARDS_ENDPOINT = 'https://sy-mcp.squareyards.com/mcp/external';
 const MP_RERA_SEARCH_ENDPOINT = 'https://www.rera.mp.gov.in/projectsrcg-loop.php';
 const MP_RERA_ORIGIN = 'https://www.rera.mp.gov.in';
-const CITIES = ['Indore', 'Jaipur', 'Ahmedabad'];
-const MAX_RESULTS = 10;
+let CITIES = [];
+const MAX_RESULTS = 20;
+
+function cityOptions(selectedCity = '') {
+  if (!CITIES.length) return '<option value="">No imported cities available</option>';
+  return CITIES.map(city => `<option value="${esc(city)}" ${city === selectedCity ? 'selected' : ''}>${esc(city)}</option>`).join('');
+}
 // Curated external project references found on property marketing/consultancy sites.
 // These confirm that a project is mentioned/listed on the source site; they do not
 // guarantee that a unit is still available. Prefer direct unit links where known.
@@ -97,23 +102,14 @@ const INDORE_PARTNER_PROJECTS = [
   ] },
   { id: '344129', name: 'Nirvana Skydeck', locality: 'Indore', developer: 'Nirvana Realty', status: 'PNB housing-project reference found', financeReference: true, links: [
     { label: 'Punjab National Bank · Housing projects', url: 'https://pnb.bank.in/housing-projects.aspx', type: 'Bank project reference' }
+  ] },
+  { id: '315798', name: 'Sugan Residency', locality: 'Mog Lines', imageMatch: 'no-confirmed-squareyards-image', status: 'Locality infrastructure record found', links: [
+    { label: 'Square Yards · Sugan Residency', url: 'https://www.squareyards.com/indore-residential-property/sugan-residency/315798/project', type: 'Project page' }
+  ] },
+  { id: '316456', name: 'Vibrant Trishla Apartments', locality: 'Rajwada', imageMatch: 'no-confirmed-squareyards-image', status: 'Rajwada ABD infrastructure records found', links: [
+    { label: 'Square Yards · Vibrant Trishla Apartments', url: 'https://www.squareyards.com/indore-residential-property/vibrant-trishla-apartments/316456/project', type: 'Project page' }
   ] }
 ];
-// Official MPIGR Collector Guideline residential plot rates (₹/sq. m) transcribed
-// from the Indore PDFs supplied for FY 2022-23 through FY 2026-27. These are
-// guideline values, not observed sale prices or apartment rates.
-const INDORE_GUIDELINE_TRENDS = {
-  '315715': { name: 'Apollo DB City', values: [26400, 26400, 35000, 50000, 60000] },
-  '315399': { name: 'Lifestyle Ocean Park', values: [20000, 20000, 30000, 40000, 52000] },
-  '315514': { name: 'BCM Planet', values: [15900, 15900, 25000, 25000, 35000] },
-  '315422': { name: 'Saakaar Atlanta Aura', values: [16000, 16000, 25000, 30000, 40000] },
-  '315410': { name: 'Shikhar Balaji Skyz', values: [14400, 14400, 17300, 25000, 35000] },
-  '315377': { name: 'Emerald Gateway (Sullakhedi)', values: [19000, 19000, 19000], years: ['2024–25', '2025–26', '2026–27'] },
-  '316116': { name: 'Shekhar Unity (Pipliyarao)', values: [65300, 65300], years: ['2025–26', '2026–27'] },
-  '340639': { name: 'Verdania Estate (Mangliya Sadak)', values: [40000], years: ['2026–27'] },
-  '344400': { name: 'Emerald Horizon Tower', values: [74000], years: ['2026–27'] }
-};
-const INDORE_GUIDELINE_YEARS = ['2022–23', '2023–24', '2024–25', '2025–26', '2026–27'];
 // Bank-published Indore project references supplied/checked during research.
 // These confirm a project-name listing, not a home-loan guarantee for a buyer or unit.
 const INDORE_FINANCE_PROJECTS = [
@@ -165,10 +161,10 @@ const INDORE_FINANCE_PROJECTS = [
   ] }
 ];
 let state = {
-  city: 'Indore',
+  city: '',
   bhk: '',
-  maxBudget: 25000000,
-  possessionStatus: 'under_construction',
+  maxBudget: 50000000,
+  possessionStatus: '',
   completionYear: '',
   buildingType: '1',
   query: '',
@@ -177,10 +173,29 @@ let state = {
   loading: false,
   loaded: false,
   error: '',
-  requestNumber: 0
+  requestNumber: 0,
+  page: 1,
+  recommendationMode: false,
+  recommendationLoading: false,
+  recommendationError: '',
+  recommendationData: null
 };
 const projectDetailsCache = new Map();
+const recommendationImageCache = new Map();
+const recommendationImageRequests = new Map();
 const detailRequests = new Map();
+const projectRecordCache = new Map();
+const projectRecordRequests = new Map();
+const projectRecordErrors = new Map();
+const financierCache = new Map();
+const financierRequests = new Map();
+const financierErrors = new Map();
+const priceTrendCache = new Map();
+const priceTrendRequests = new Map();
+const priceTrendErrors = new Map();
+const infrastructureCache = new Map();
+const infrastructureRequests = new Map();
+const infrastructureErrors = new Map();
 const developerDetailsCache = new Map();
 const developerRequests = new Map();
 const developerErrors = new Map();
@@ -227,7 +242,7 @@ function footer() {
 
 function home() {
   return `${header('Home')}<main><div class="shell"><section class="hero"><div><div class="eyebrow">Your life in India, made easier</div><h1>Your trusted concierge for every NRI need in India.</h1><p class="hero-copy">From finding a home to taking care of the details, we make it simpler to stay close to the place you call home.</p><div class="hero-actions"><a class="btn btn-gold" href="#services">EXPLORE SERVICES　→</a><button class="btn btn-outline" onclick="openModal('Talk to our concierge')">☏ &nbsp;TALK TO A CONCIERGE</button></div></div><div class="hero-art"><img src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1100&q=85" alt="A modern home in India"><div class="art-label">A little closer to home <span style="color:var(--gold)">✦</span></div></div></section>
-  <div class="searchbar"><input id="home-search" placeholder="⌕　Project name (optional)" /><select id="home-city">${CITIES.map(city => `<option>${city}</option>`).join('')}</select><button class="btn btn-gold" onclick="searchProperties()">SEARCH　⌕</button></div>
+  <div class="searchbar"><input id="home-search" placeholder="⌕　Project name (optional)" /><select id="home-city">${cityOptions(state.city)}</select><button class="btn btn-gold" onclick="searchProperties()">SEARCH　⌕</button></div>
   <section class="services" id="services"><div class="section-head"><div class="eyebrow" style="justify-content:center">Thoughtfully connected</div><h2>All services in one place</h2><p>Choose the support you need, wherever life takes you.</p></div><div class="service-grid">${services.map(([icon, name, desc, enabled]) => `<div class="service-card ${enabled ? 'active' : 'disabled'}" ${enabled ? 'onclick="location.href=\'/real-estate\'"' : 'aria-disabled="true" title="Coming soon"'}><span class="service-icon">${icon}</span><strong>${name}</strong><p>${desc}</p><span class="service-link">${enabled ? 'EXPLORE →' : 'COMING SOON'}</span></div>`).join('')}</div></section></div>
   <section class="strip"><div class="shell strip-inner"><div><strong>Looking for a home in India?</strong><small>Explore projects from Square Yards’ property data.</small></div><a class="btn btn-gold" href="/real-estate">DISCOVER REAL ESTATE　→</a></div></section>
   <section class="shell" id="how" style="padding-bottom:58px"><div class="section-head"><div class="eyebrow" style="justify-content:center">Simple, thoughtful support</div><h2>How it works</h2></div><div class="how-grid"><div class="how-item"><span class="step">01</span><div><strong>Choose a service</strong><p>Tell us what you need, from property to everyday essentials.</p></div></div><div class="how-item"><span class="step">02</span><div><strong>Explore trusted options</strong><p>Browse project information and compare your options.</p></div></div><div class="how-item"><span class="step">03</span><div><strong>We’re here to help</strong><p>Get personal support throughout your journey.</p></div></div></div></section>
@@ -239,6 +254,46 @@ function projectImage(project) {
   if (/^https:\/\//i.test(raw)) return esc(raw);
   if (/^[\w./-]+$/.test(raw) && !raw.includes('..')) return `https://static.squareyards.com/${raw.replace(/^\/+/, '')}`;
   return '';
+}
+
+function projectImageFromDetails(response) {
+  const detail = response?.detail || response;
+  const project = detail?.projectData || response?.projectData || {};
+  const images = Array.isArray(project.images)
+    ? project.images.map(image => typeof image === 'string' ? image : (image?.image || image?.url || image?.src || '')).find(Boolean)
+    : '';
+  return images || project.image || '';
+}
+
+function loadRecommendationImage(id) {
+  const key = String(id);
+  if (recommendationImageCache.has(key) || recommendationImageRequests.has(key)) return recommendationImageRequests.get(key) || Promise.resolve();
+  const request = mcpCall('get_entity_details', { entity: 'project', id: key })
+    .then(response => {
+      const image = projectImageFromDetails(response);
+      recommendationImageCache.set(key, image || '');
+      projectDetailsCache.set(key, response);
+    })
+    .catch(() => recommendationImageCache.set(key, ''))
+    .finally(() => {
+      recommendationImageRequests.delete(key);
+      if (state.recommendationMode && location.pathname.startsWith('/real-estate')) render();
+    });
+  recommendationImageRequests.set(key, request);
+  return request;
+}
+
+function loadRecommendationImages(recommendations) {
+  const queue = recommendations
+    .map(item => String(item.project?.project_id ?? item.project?.id ?? ''))
+    .filter(Boolean)
+    .filter(id => !recommendationImageCache.has(id) && !recommendationImageRequests.has(id));
+  const loadBatch = async () => {
+    for (let index = 0; index < queue.length; index += 4) {
+      await Promise.all(queue.slice(index, index + 4).map(loadRecommendationImage));
+    }
+  };
+  if (queue.length) loadBatch();
 }
 
 function imageLoadFailed(image) {
@@ -336,16 +391,51 @@ function indorePartnerSection() {
 function indoreFinanceCard(item) {
   const finance = item.banks.map(bank => `<div class="finance-bank-row"><span class="finance-bank-mark" aria-hidden="true">${esc(bank.bank.split(' ').map(word => word[0]).join('').slice(0, 3))}</span><div class="finance-bank-copy"><b>${esc(bank.bank)}</b><small>${esc(bank.status)}</small><span>Bank list: ${esc(bank.listed)}${bank.builder ? ` · Builder: ${esc(bank.builder)}` : ''}${bank.code ? ` · Code: ${esc(bank.code)}` : ''}</span></div><a href="${esc(bank.url)}" target="_blank" rel="noopener noreferrer" aria-label="Search ${esc(bank.bank)} source">SOURCE ↗</a></div>`).join('');
   const possible = (item.possibleBanks || []).map(bank => `<div class="finance-bank-row finance-bank-possible"><span class="finance-bank-mark" aria-hidden="true">${esc(bank.bank.split(' ').map(word => word[0]).join('').slice(0, 3))}</span><div class="finance-bank-copy"><b>${esc(bank.bank)} · Possible match</b><small>${esc(bank.status)}</small><span>Bank list: ${esc(bank.listed)}${bank.code ? ` · Code: ${esc(bank.code)}` : ''}</span></div><a href="${esc(bank.url)}" target="_blank" rel="noopener noreferrer" aria-label="Check ${esc(bank.bank)} source">CHECK ↗</a></div>`).join('');
-  const trend = INDORE_GUIDELINE_TRENDS[item.id];
-  return `<article class="finance-project-card"><div class="finance-project-head"><div><h3>${esc(item.name)}</h3><small>Square Yards project ID: ${esc(item.id)}</small></div><button class="btn btn-navy" onclick="openDetails('${esc(item.id)}')">PROJECT DETAILS</button></div><div class="finance-bank-list">${finance}${possible}</div><div class="finance-project-foot">${trend ? `<span>Government guideline data available</span><button class="finance-trend-link" onclick="openProjectTrend('${esc(item.id)}')">View price trend ↗</button>` : '<span>No named guideline trend in current dataset</span>'}</div></article>`;
+  return `<article class="finance-project-card"><div class="finance-project-head"><div><h3>${esc(item.name)}</h3><small>Square Yards project ID: ${esc(item.id)}</small></div><button class="btn btn-navy" onclick="openDetails('${esc(item.id)}')">PROJECT DETAILS</button></div><div class="finance-bank-list">${finance}${possible}</div><div class="finance-project-foot"><span>Locality guideline trend</span><button class="finance-trend-link" onclick="openProjectTrend('${esc(item.id)}')">View trend ↗</button></div></article>`;
 }
 
-function indoreFinanceSection(projectId = '') {
-  const matches = projectId
-    ? INDORE_FINANCE_PROJECTS.filter(item => item.id === String(projectId))
-    : INDORE_FINANCE_PROJECTS;
-  const cards = matches.map(indoreFinanceCard).join('');
-  return `<section class="detail-section finance-section"><div class="eyebrow">Bank-published project lists</div><h2>Home finance references</h2><p class="section-intro">These Indore projects appear in the bank source lists shown below. Open a bank source to check its listing. A project listing is not a loan approval or rate quote for an individual buyer.</p>${cards ? `<div class="finance-project-grid">${cards}</div>` : '<p>No bank-list match has been recorded for this project in our current research.</p>'}<p class="partner-section-note">Project names and phases can differ across lists. Confirm the exact phase, builder and unit with the bank before relying on a financing claim. Bank approval remains subject to the bank’s current policy and the buyer’s eligibility.</p></section>`;
+function cityFinanceSection(projectId = '') {
+  const key = String(projectId);
+  const result = financierCache.get(key);
+  if (!result) {
+    if (financierErrors.has(key)) {
+      return `<section class="detail-section finance-section"><div class="eyebrow">Bank-published project lists</div><h2>Home finance references</h2><p>${esc(financierErrors.get(key))}</p><button class="btn btn-outline" onclick="loadFinancierReferences('${esc(key)}',true)">TRY AGAIN</button></section>`;
+    }
+    queueMicrotask(() => loadFinancierReferences(key));
+    return `<section class="detail-section finance-section"><div class="eyebrow">Bank-published project lists</div><h2>Home finance references</h2><div class="developer-loading"><span class="loader"></span><p>Loading bank references for this project…</p></div></section>`;
+  }
+  const cards = result.finance_references.map(reference => {
+    const bank = reference.financier_name || 'Financier';
+    const initials = bank.split(' ').map(word => word[0]).join('').slice(0, 3);
+    const status = reference.match_status === 'exact' ? 'Exact project match' : reference.match_status === 'possible' ? 'Possible project match · verify identity' : reference.match_status === 'unmatched' ? 'Unmatched bank listing' : 'Listed by financier';
+    const url = reference.source_url ? `<a href="${esc(reference.source_url)}" target="_blank" rel="noopener noreferrer">SOURCE ↗</a>` : '';
+    return `<div class="finance-bank-row ${reference.match_status === 'possible' || reference.match_status === 'unmatched' ? 'finance-bank-possible' : ''}"><span class="finance-bank-mark" aria-hidden="true">${esc(initials)}</span><div class="finance-bank-copy"><b>${esc(bank)}</b><small>${esc(status)}${reference.source_title ? ` · ${esc(reference.source_title)}` : ''}</small><span>Bank list: ${esc(reference.listed_project_name)}${reference.builder_name ? ` · Builder: ${esc(reference.builder_name)}` : ''}${reference.bank_project_code ? ` · Code: ${esc(reference.bank_project_code)}` : ''}${reference.match_note ? ` · ${esc(reference.match_note)}` : ''}</span></div>${url}</div>`;
+  }).join('');
+  return `<section class="detail-section finance-section"><div class="eyebrow">Bank-published project lists</div><h2>Home finance references</h2><p class="section-intro">Bank references linked to this project in our database. Open a source to review the listing. A project listing is not a loan approval or rate quote for an individual buyer.</p>${cards ? `<div class="finance-bank-list">${cards}</div>` : '<p>No bank-list match has been recorded for this project in our current database.</p>'}<p class="partner-section-note">Confirm the exact project phase, builder and unit with the financier. Approval remains subject to the financier’s current policy and the buyer’s eligibility.</p></section>`;
+}
+
+function loadFinancierReferences(projectId, retry = false) {
+  const key = String(projectId);
+  if (financierCache.has(key) || financierRequests.has(key)) return financierRequests.get(key);
+  if (retry) financierErrors.delete(key);
+  const request = ensureProjectRecord(key).then(saved => {
+    if (!saved) throw new Error(projectRecordErrors.get(key) || 'Could not prepare this project for the finance lookup.');
+    return fetch(`/api/financier-projects?project_id=${encodeURIComponent(key)}`, { headers: { Accept: 'application/json' } });
+  })
+    .then(async response => {
+      const payload = await response.json();
+      if (!response.ok || !payload?.ok) throw new Error(payload?.error || `Finance lookup failed (${response.status}).`);
+      if (!Array.isArray(payload.finance_references)) throw new Error('The finance API response did not include finance_references.');
+      financierCache.set(key, payload);
+      financierErrors.delete(key);
+    })
+    .catch(error => financierErrors.set(key, error.message || 'Could not load financier references.'))
+    .finally(() => {
+      financierRequests.delete(key);
+      if (location.pathname.startsWith(`/property/${key}`)) render();
+    });
+  financierRequests.set(key, request);
+  return request;
 }
 
 function partnerDetailsSection(id) {
@@ -355,54 +445,111 @@ function partnerDetailsSection(id) {
   return `<section class="detail-section partner-detail-section"><div class="eyebrow">Local property partners</div><h2>Where to enquire about this project</h2><p class="section-intro">Choose a website to view its project page or available listings. You’ll leave NRI Ease when you open a link.</p><div class="partner-listing-status"><span class="source-dot"></span><div><b>${esc(partner.status)}</b><small>${esc(partner.locality)} · Indore</small></div></div><div class="partner-source-grid">${sourceCards}</div><p class="partner-section-note">Listings and prices can change. Confirm current availability and project details with the provider.</p></section>`;
 }
 
-function formatGuidelineRate(value) {
-  return `₹${Number(value).toLocaleString('en-IN')}`;
-}
-
 function trendPercent(current, previous) {
   return previous > 0 ? ((current / previous) - 1) * 100 : null;
 }
 
 function formatTrendPercent(value) {
-  return value === null ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
+  return value === null || !Number.isFinite(value) ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
 }
 
-function indoreAppreciationSection(id, projectName) {
-  const trend = INDORE_GUIDELINE_TRENDS[String(id)];
+const SQM_PER_SQFT = 10.7639;
+function formatSqftRate(value) {
+  const rate = Number(value) / SQM_PER_SQFT;
+  return Number.isFinite(rate) ? `₹${rate.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—';
+}
+
+function loadPriceTrend(id, retry = false) {
+  const key = String(id);
+  if (priceTrendCache.has(key) || priceTrendRequests.has(key)) return priceTrendRequests.get(key);
+  if (retry) priceTrendErrors.delete(key);
+  const request = ensureProjectRecord(key).then(saved => {
+    if (!saved) throw new Error(projectRecordErrors.get(key) || 'Could not prepare this project for the price-trends lookup.');
+    return fetch(`/api/price-trends?project_id=${encodeURIComponent(key)}&rate_code=plot_residential_sqm`, { headers: { Accept: 'application/json' } });
+  })
+    .then(async response => {
+      const payload = await response.json();
+      if (response.status === 404 && /No (?:guideline rows matched|residential DLC rate history is stored)/i.test(payload?.error || '')) {
+        priceTrendCache.set(key, { ...payload, points: [] });
+        priceTrendErrors.delete(key);
+        return;
+      }
+      if (!response.ok || !payload?.ok) throw new Error(payload?.error || `Price trend request failed (${response.status}).`);
+      if (!Array.isArray(payload.points)) throw new Error('The price trend API response did not include a points array.');
+      priceTrendCache.set(key, payload);
+      priceTrendErrors.delete(key);
+    })
+    .catch(error => priceTrendErrors.set(key, error.message || 'Could not load locality guideline data.'))
+    .finally(() => {
+      priceTrendRequests.delete(key);
+      if (location.pathname.startsWith(`/property/${key}`)) render();
+    });
+  priceTrendRequests.set(key, request);
+  return request;
+}
+
+function cityAppreciationSection(id, projectName, city = '') {
+  const key = String(id);
+  const trend = priceTrendCache.get(key);
+  const sourceLabel = trend?.source_label || (city ? `Official valuation schedule for ${city}` : 'Official locality valuation schedule');
   if (!trend) {
-    return `<section id="property-appreciation" class="detail-section appreciation-section"><div class="eyebrow">Indore guideline data</div><h2>Property appreciation trend</h2><p class="section-intro">We could not confidently match ${esc(projectName)} to a named entry across all five Indore Collector Guideline PDFs, so we’re not estimating a project trend. A locality match can be added when the registration area and land category are confirmed.</p><div class="appreciation-source"><span aria-hidden="true">i</span><p>The guideline schedules provide government valuation benchmarks. They do not report actual sale prices or apartment appreciation.</p></div></section>`;
+    if (priceTrendErrors.has(key)) {
+      const error = priceTrendErrors.get(key);
+      const retryButton = /rate-history tables are not set up/i.test(error) ? '' : `<button class="btn btn-outline" onclick="retryPriceTrend('${esc(key)}')">TRY AGAIN</button>`;
+      return `<section id="property-appreciation" class="detail-section appreciation-section"><div class="eyebrow">${esc(sourceLabel)}</div><h2>Property appreciation trend</h2><p class="section-intro">${esc(projectName)} · locality-based residential plot guideline benchmark.</p><div class="appreciation-api-error"><p>${esc(error)}</p>${retryButton}</div><div class="appreciation-source"><span aria-hidden="true">i</span><p>This is a government guideline benchmark, not a transaction-price trend. A dated locality rate history is required to calculate a trend.</p></div></section>`;
+    }
+    queueMicrotask(() => loadPriceTrend(key));
+    return `<section id="property-appreciation" class="detail-section appreciation-section"><div class="eyebrow">${esc(sourceLabel)}</div><h2>Property appreciation trend</h2><p class="section-intro">${esc(projectName)} · loading residential plot guideline rates for the project locality…</p><div class="appreciation-api-loading"><span class="loader"></span><span>Loading locality guideline rates from the API</span></div></section>`;
   }
-  const values = trend.values;
-  const years = trend.years || INDORE_GUIDELINE_YEARS;
-  if (values.length === 1) {
-    const year = years[0];
-    const value = values[0];
-    return `<section id="property-appreciation" class="detail-section appreciation-section"><div class="eyebrow">Official Indore guideline schedule</div><h2>Property appreciation trend</h2><p class="section-intro">${esc(trend.name)} · one named residential plot guideline entry found for FY ${esc(year)}.</p><div class="appreciation-metrics"><div><small>FY ${esc(year)} residential plot guideline</small><b>${formatGuidelineRate(value)} / sq. m</b><span>One year-specific record; not enough points for a trend chart</span></div></div><div class="appreciation-table-wrap"><table class="appreciation-table"><caption>Available official guideline record</caption><thead><tr><th scope="col">Financial year</th><th scope="col">Named residential plot guideline</th><th scope="col">Year-over-year change</th></tr></thead><tbody><tr><th scope="row">FY ${esc(year)}</th><td>${formatGuidelineRate(value)} / sq. m</td><td>Not calculated · earlier matching entries not found</td></tr></tbody></table></div><div class="appreciation-source"><span aria-hidden="true">i</span><p>This is a named-entry government guideline benchmark, not a multi-year appreciation trend, registered transaction price, current asking price, or apartment price. <a href="https://www.mpigr.gov.in/#/guidline-view" target="_blank" rel="noopener noreferrer">View MPIGR guidelines ↗</a></p></div></section>`;
-  }
-  const maxValue = Math.ceil(Math.max(...values) / 10000) * 10000;
+  const points = trend.points.map(point => ({
+    ...point,
+    year: String(point.financial_year),
+    average: Number(point.average_rate),
+    minimum: Number(point.min_rate),
+    maximum: Number(point.max_rate)
+  })).filter(point => Number.isFinite(point.average) && Number.isFinite(point.maximum)).sort((a, b) => a.year.localeCompare(b.year));
+  if (!points.length) return `<section id="property-appreciation" class="detail-section appreciation-section"><div class="eyebrow">${esc(sourceLabel)}</div><h2>Property appreciation trend</h2><p class="section-intro">${esc(trend.error || `No residential DLC rate history is currently stored for ${trend.locality || trend.project?.locality || projectName}.`)}</p><div class="appreciation-source"><span aria-hidden="true">i</span><p>A locality match-review row is not rate history. Dated rate values must be imported for this locality before a trend can be displayed.</p></div></section>`;
   const chartWidth = 720, chartHeight = 270, left = 76, right = 24, top = 18, bottom = 48;
   const innerWidth = chartWidth - left - right, innerHeight = chartHeight - top - bottom;
-  const points = values.map((value, index) => ({
-    x: left + innerWidth * index / (values.length - 1),
-    y: top + innerHeight * (1 - value / maxValue), value
-  }));
+  const maxRate = Math.max(...points.map(point => point.maximum / SQM_PER_SQFT));
+  const axisMax = Math.max(1, Math.ceil(maxRate / 1000) * 1000);
+  const coords = field => points.map((point, index) => {
+    const value = point[field] / SQM_PER_SQFT;
+    return { x: points.length === 1 ? left + innerWidth / 2 : left + innerWidth * index / (points.length - 1), y: top + innerHeight * (1 - value / axisMax), value, point };
+  });
+  const avgPoints = coords('average'), maxPoints = coords('maximum');
   const grid = Array.from({ length: 5 }, (_, index) => {
-    const value = maxValue * (4 - index) / 4;
+    const value = axisMax * (4 - index) / 4;
     const y = top + innerHeight * index / 4;
-    return `<line x1="${left}" y1="${y}" x2="${chartWidth - right}" y2="${y}" class="trend-gridline"/><text x="${left - 10}" y="${y + 4}" text-anchor="end" class="trend-axis-label">${Math.round(value / 1000)}k</text>`;
+    return `<line x1="${left}" y1="${y}" x2="${chartWidth - right}" y2="${y}" class="trend-gridline"/><text x="${left - 10}" y="${y + 4}" text-anchor="end" class="trend-axis-label">₹${value >= 1000 ? `${(value / 1000).toFixed(value % 1000 ? 1 : 0)}k` : Math.round(value)}</text>`;
   }).join('');
-  const polyline = points.map(point => `${point.x},${point.y}`).join(' ');
-  const markers = points.map((point, index) => `<circle cx="${point.x}" cy="${point.y}" r="5" class="trend-marker"><title>FY ${years[index]}: ${formatGuidelineRate(point.value)} per sq. m</title></circle><text x="${point.x}" y="${chartHeight - 15}" text-anchor="middle" class="trend-axis-label">${years[index]}</text>`).join('');
-  const latestYoy = trendPercent(values.at(-1), values.at(-2));
-  const totalGrowth = trendPercent(values.at(-1), values[0]);
-  const spanYears = Number(years.at(-1).slice(0, 4)) - Number(years[0].slice(0, 4));
-  const cagr = (Math.pow(values.at(-1) / values[0], 1 / spanYears) - 1) * 100;
-  const historicalRows = values.map((value, index) => `<tr><th scope="row">FY ${years[index]}</th><td>${formatGuidelineRate(value)} / sq. m</td><td>${index === 0 ? 'Base year' : formatTrendPercent(trendPercent(value, values[index - 1]))}</td></tr>`).join('');
-  const firstYear = years[0], lastYear = years.at(-1);
-  return `<section id="property-appreciation" class="detail-section appreciation-section"><div class="eyebrow">Official Indore guideline schedule</div><h2>Property appreciation trend</h2><p class="section-intro">${esc(trend.name)} · named residential plot guideline rates, FY ${esc(firstYear)} to FY ${esc(lastYear)}.</p><div class="appreciation-chart-card"><div class="appreciation-chart-heading"><div><b>Collector Guideline rate</b><small>Residential plot · ₹ per sq. m</small></div><span class="appreciation-legend"><i></i> Guideline rate</span></div><div class="appreciation-chart-scroll"><svg class="appreciation-chart" viewBox="0 0 ${chartWidth} ${chartHeight}" role="img" aria-label="Collector Guideline rate trend for ${esc(trend.name)}">${grid}<polyline points="${polyline}" class="trend-line"/>${markers}</svg></div></div><div class="appreciation-metrics"><div><small>Latest year-over-year</small><b>${formatTrendPercent(latestYoy)}</b><span>FY ${esc(years.at(-2))} to FY ${esc(lastYear)}</span></div><div><small>Total change</small><b>${formatTrendPercent(totalGrowth)}</b><span>FY ${esc(firstYear)} to FY ${esc(lastYear)}</span></div><div><small>Annualized change</small><b>${formatTrendPercent(cagr)}</b><span>${spanYears}-year CAGR</span></div></div><div class="appreciation-table-wrap"><table class="appreciation-table"><caption>Rate history and year-over-year movement</caption><thead><tr><th scope="col">Financial year</th><th scope="col">Residential plot guideline</th><th scope="col">Year-over-year change</th></tr></thead><tbody>${historicalRows}</tbody></table></div><div class="appreciation-source"><span aria-hidden="true">i</span><p><b>How to read this:</b> these are the government’s named-entry residential plot guideline rates, not registered transaction prices, current asking prices, or apartment prices. Annualized change uses only the years with a matching named entry; earlier missing years are not estimated. Rates can vary by plot category and road/location sub-clause. <a href="https://www.mpigr.gov.in/#/guidline-view" target="_blank" rel="noopener noreferrer">View MPIGR guidelines ↗</a></p></div></section>`;
+  const polyline = list => list.map(point => `${point.x},${point.y}`).join(' ');
+  const yearLabels = points.map((point, index) => `<text x="${avgPoints[index].x}" y="${chartHeight - 15}" text-anchor="middle" class="trend-axis-label">${esc(point.year)}</text>`).join('');
+  const averageMarkers = avgPoints.map(point => `<circle cx="${point.x}" cy="${point.y}" r="4.5" class="trend-marker"><title>FY ${esc(point.point.year)} average: ${formatSqftRate(point.point.average)} per sq. ft.; ${esc(point.point.matched_records)} records</title></circle>`).join('');
+  const maximumMarkers = maxPoints.map(point => `<circle cx="${point.x}" cy="${point.y}" r="4" class="trend-max-marker"><title>FY ${esc(point.point.year)} maximum: ${formatSqftRate(point.point.maximum)} per sq. ft.</title></circle>`).join('');
+  const averages = points.map(point => point.average);
+  const latestYoy = averages.length > 1 ? trendPercent(averages.at(-1), averages.at(-2)) : null;
+  const totalGrowth = averages.length > 1 ? trendPercent(averages.at(-1), averages[0]) : null;
+  const spanYears = averages.length > 1 ? Number(points.at(-1).year.slice(0, 4)) - Number(points[0].year.slice(0, 4)) : 0;
+  const cagr = spanYears > 0 && averages[0] > 0 ? (Math.pow(averages.at(-1) / averages[0], 1 / spanYears) - 1) * 100 : null;
+  const historicalRows = points.map((point, index) => `<tr><th scope="row">FY ${esc(point.year)}</th><td>${formatSqftRate(point.average)} / sq. ft.</td><td>${formatSqftRate(point.maximum)} / sq. ft.</td><td>${index === 0 ? 'Base year' : formatTrendPercent(trendPercent(point.average, points[index - 1].average))}</td><td>${Number(point.matched_records).toLocaleString('en-IN')}</td></tr>`).join('');
+  const firstYear = points[0].year, lastYear = points.at(-1).year;
+  const previousAvailable = points.length > 1 ? `FY ${points.at(-2).year} to FY ${lastYear}` : 'Only one financial year returned';
+  const sourceLinks = [...new Map(points.flatMap(point => point.sources || []).map(source => [source.url || source.name, source])).values()];
+  const sources = sourceLinks.map(source => {
+    const url = /^https:\/\//i.test(String(source.url || '')) ? source.url : '';
+    return url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(source.name || 'Source PDF')} ↗</a>` : esc(source.name || 'Source PDF');
+  }).join(' · ');
+  return `<section id="property-appreciation" class="detail-section appreciation-section"><div class="eyebrow">${esc(sourceLabel)}</div><h2>Property appreciation trend</h2><p class="section-intro">${esc(trend.project?.locality || projectName)} · locality-based residential plot guideline rates, ${esc(firstYear)} to ${esc(lastYear)}.</p><div class="appreciation-chart-card"><div class="appreciation-chart-heading"><div><b>Collector Guideline rate</b><small>Residential plot · ₹ per sq. ft. (converted from API ₹/sq. m)</small></div><span class="appreciation-legend"><i></i> Average <i class="legend-max"></i> Maximum</span></div><div class="appreciation-chart-scroll"><svg class="appreciation-chart" viewBox="0 0 ${chartWidth} ${chartHeight}" role="img" aria-label="Average and maximum locality collector guideline rates for ${esc(trend.project?.locality || projectName)}">${grid}<polyline points="${polyline(avgPoints)}" class="trend-line"/><polyline points="${polyline(maxPoints)}" class="trend-line trend-line-max"/>${averageMarkers}${maximumMarkers}${yearLabels}</svg></div></div><div class="appreciation-metrics"><div><small>Latest available-period change</small><b>${formatTrendPercent(latestYoy)}</b><span>${esc(previousAvailable)}</span></div><div><small>Average rate total change</small><b>${formatTrendPercent(totalGrowth)}</b><span>${esc(firstYear)} to ${esc(lastYear)}</span></div><div><small>Average rate annualized change</small><b>${formatTrendPercent(cagr)}</b><span>${spanYears ? `${spanYears}-year CAGR across available endpoints` : 'Not enough years to calculate'}</span></div></div><div class="appreciation-table-wrap"><table class="appreciation-table"><caption>Rate history and year-over-year movement</caption><thead><tr><th scope="col">Year</th><th scope="col">Average guideline / sq. ft.</th><th scope="col">Maximum guideline / sq. ft.</th><th scope="col">Average rate change</th><th scope="col">Matched records</th></tr></thead><tbody>${historicalRows}</tbody></table></div><div class="appreciation-source"><span aria-hidden="true">i</span><p><b>How to read this:</b> the API aggregates ${esc(trend.aggregation || 'matching locality records')}. Values are converted from ₹/sq. m to ₹/sq. ft. by dividing by 10.7639. Rate changes compare adjacent available periods; missing periods are not estimated. These are government guideline benchmarks, not actual sale prices, asking prices, or apartment prices. ${esc(trend.data_note || '')}${sources ? `<br><b>Sources:</b> ${sources}` : ''}</p></div></section>`;
 }
 
-function projectCard(project) {
+function retryPriceTrend(id) {
+  priceTrendCache.delete(String(id));
+  loadPriceTrend(id, true);
+  render();
+}
+
+function projectCard(project, recommendation = null) {
   const id = esc(project.id);
   const name = esc(project.name || 'Project');
   const beds = Array.isArray(project.bhkConfigs) ? project.bhkConfigs.join(' · ') : 'BHK details not listed';
@@ -413,7 +560,9 @@ function projectCard(project) {
   const price = esc(project.priceText || (project.priceOnRequest ? 'Price on request' : 'Price not listed'));
   const partner = partnerProjectFor(project.id);
   const area = project.minSize && project.maxSize ? `${esc(project.minSize)}–${esc(project.maxSize)} sq.ft. ${esc(project.areaUnit || '')}` : '';
-  return `<article class="property-card live-property-card"><div class="property-image">${projectImage(project) ? `<img src="${projectImage(project)}" alt="${name} project image" loading="lazy" onerror="imageLoadFailed(this)">` : '<div class="image-unavailable" role="img" aria-label="Project image unavailable"></div>'}<span class="badge">${partner ? 'PARTNER LISTING FOUND' : 'SQUARE YARDS DATA'}</span></div><div class="property-info"><h3>${name}</h3><p class="developer">${developer} · ${city}</p><p class="property-meta">${esc(locality)} · ${status}</p><p class="property-meta">${esc(beds)}${area ? ` · ${area}` : ''}</p><div class="price">${price}</div><div class="card-actions"><button class="btn btn-navy" onclick="openDetails('${id}')">VIEW DETAILS</button><button class="btn btn-gold" onclick="openModal('Enquire about ${name}')">ENQUIRE</button></div></div></article>`;
+  const rank = Number(recommendation?.rank) || Number(recommendation?.recommendation_rank) || Number(recommendation?.position) || null;
+  const badge = recommendation ? `HIGHLY RECOMMENDED · #${rank || '—'}` : partner ? 'PARTNER LISTING FOUND' : 'SQUARE YARDS DATA';
+  return `<article class="property-card live-property-card"><div class="property-image">${projectImage(project) ? `<img src="${projectImage(project)}" alt="${name} project image" loading="lazy" onerror="imageLoadFailed(this)">` : '<div class="image-unavailable" role="img" aria-label="Project image unavailable"></div>'}<span class="badge">${badge}</span></div><div class="property-info"><h3>${name}</h3><p class="developer">${developer} · ${city}</p><p class="property-meta">${esc(locality)} · ${status}</p><p class="property-meta">${esc(beds)}${area ? ` · ${area}` : ''}</p><div class="price">${price}</div><div class="card-actions"><button class="btn btn-navy" onclick="openDetails('${id}')">VIEW DETAILS</button><button class="btn btn-gold" onclick="openModal('Enquire about ${name}')">ENQUIRE</button></div></div></article>`;
 }
 
 function formatFiltersSummary() {
@@ -426,38 +575,94 @@ function formatFiltersSummary() {
   return parts.map(esc).join(' · ');
 }
 
+function paginationMarkup() {
+  const pages = Math.ceil(state.total / MAX_RESULTS);
+  if (pages <= 1) return '';
+  const start = ((state.page - 1) * MAX_RESULTS) + 1;
+  const end = Math.min(state.page * MAX_RESULTS, state.total);
+  return `<nav class="pagination live-pagination" aria-label="Project pages"><span class="pagination-summary">Showing ${start}–${end} of ${state.total}</span><button class="page" onclick="loadProjects(${state.page - 1})" ${state.page <= 1 ? 'disabled' : ''} aria-label="Previous page">‹ Previous</button><span class="page-number">Page ${state.page} of ${pages}</span><button class="page" onclick="loadProjects(${state.page + 1})" ${state.page >= pages ? 'disabled' : ''} aria-label="Next page">Next ›</button></nav>`;
+}
+
 function realEstate() {
-  if (!state.loaded && !state.loading && !state.error) queueMicrotask(loadProjects);
-  const eligibleProjects = state.city === 'Indore' ? state.projects.filter(project => partnerProjectFor(project.id)) : state.projects;
-  const visible = eligibleProjects.slice(0, MAX_RESULTS);
-  const count = state.city === 'Indore'
-    ? `${INDORE_PARTNER_PROJECTS.length} Indore projects with external listings`
-    : state.total ? `Showing ${visible.length} of ${state.total} projects` : `${visible.length} projects`;
+  if (!state.recommendationMode && !state.loaded && !state.loading && !state.error) queueMicrotask(loadProjects);
+  const recommendations = state.recommendationData?.properties || [];
+  const visible = state.recommendationMode
+    ? recommendations.map(item => {
+      const id = String(item.project?.project_id ?? item.project?.id ?? '');
+      const listed = state.projects.find(project => String(project.id) === id) || {};
+      return { ...listed, ...item.project, id, name: item.project?.project_name || item.project?.name || listed.name, image: item.project?.image || listed.image || recommendationImageCache.get(id) || '', locality: item.project?.locality || listed.locality || 'Locality not listed', city: item.project?.city || listed.city || state.city, status: listed.status || 'Recommended from available evidence' };
+    })
+    : state.projects;
+  const total = state.recommendationMode ? recommendations.length : state.total;
+  const firstResult = state.total ? ((state.page - 1) * MAX_RESULTS) + 1 : 0;
+  const lastResult = Math.min(state.page * MAX_RESULTS, state.total);
+  const count = state.recommendationMode ? `${total} recommended ${state.city} projects` : state.total ? `Showing ${firstResult}–${lastResult} of ${state.total} projects` : `${visible.length} projects`;
   let resultContent;
-  if (state.loading) {
+  if (state.recommendationMode && state.recommendationLoading) {
+    resultContent = `<div class="api-state loading-state"><span class="loader"></span><div><b>Finding highly recommended properties</b><p>Scoring ${esc(state.city)} projects from the latest API data…</p></div></div>`;
+  } else if (state.recommendationMode && state.recommendationError) {
+    resultContent = `<div class="api-state error-state"><b>Recommendations could not be loaded.</b><p>${esc(state.recommendationError)}</p><button class="btn btn-navy" onclick="loadRecommendations()">TRY AGAIN</button></div>`;
+  } else if (state.recommendationMode && !visible.length) {
+    resultContent = `<div class="api-state"><b>No ranked projects are available yet.</b><p>Make sure ${esc(state.city)} projects and their finance, guideline-rate, and infrastructure data are present in the database.</p></div>`;
+  } else if (state.recommendationMode) {
+    resultContent = `<div class="recommendation-intro"><b>Top ${esc(state.city)} properties by available evidence</b><span>Recommendations use the evidence currently available for each project.</span></div><div class="property-grid">${visible.map((project, index) => projectCard(project, { ...recommendations[index], rank: recommendations[index]?.rank || index + 1 })).join('')}</div>`;
+    queueMicrotask(() => loadRecommendationImages(recommendations));
+  } else if (state.loading) {
     resultContent = `<div class="api-state loading-state"><span class="loader"></span><div><b>Finding matching projects</b><p>Loading live project data from Square Yards…</p></div></div>`;
   } else if (state.error) {
     resultContent = `<div class="api-state error-state"><b>We couldn’t load projects right now.</b><p>${esc(state.error)}</p><button class="btn btn-navy" onclick="loadProjects()">TRY AGAIN</button></div>`;
   } else if (!visible.length) {
-    resultContent = state.city === 'Indore' ? '' : `<div class="api-state"><b>No projects matched these filters.</b><p>Try another completion year or increase the maximum budget.</p></div>`;
+    resultContent = `<div class="api-state"><b>No projects matched these filters.</b><p>Try another completion year, possession status, or increase the maximum budget.</p></div>`;
   } else {
-    resultContent = `<div class="property-grid">${visible.map(projectCard).join('')}</div>`;
+    resultContent = `<div class="property-grid">${visible.map(projectCard).join('')}</div>${paginationMarkup()}`;
   }
 
   return `${header('Services')}<main class="shell real-estate-page"><div class="crumb"><a href="/">Home</a><span>›</span> Services <span>›</span> <b>Real Estate</b></div>
-    <div class="listing-title"><div><div class="eyebrow">Find your place in India</div><h1>Real estate, made more personal.</h1><p>${state.city === 'Indore' ? 'Indore projects with links to property and consultancy sites.' : 'Live project results from Square Yards, matched to your search.'}</p></div><span class="list-count">${esc(count)}</span></div>
+    <div class="listing-title"><div><div class="eyebrow">Find your place in India</div><h1>Real estate, made more personal.</h1><p>Live project results from Square Yards, matched to your search.</p></div><span class="list-count">${esc(count)}</span></div>
     <section class="filters live-filters"><div class="filter-grid live-filter-grid">
-      <div class="filter"><label for="city-filter">City</label><select id="city-filter" onchange="changeFilter('city',this.value)">${CITIES.map(city => `<option value="${city}" ${state.city === city ? 'selected' : ''}>${city}</option>`).join('')}</select></div>
+      <div class="filter"><label for="city-filter">City</label><select id="city-filter" onchange="changeFilter('city',this.value)">${cityOptions(state.city)}</select></div>
       <div class="filter"><label for="bhk-filter">BHK</label><select id="bhk-filter" onchange="changeFilter('bhk',this.value)"><option value="">Any BHK</option><option value="1" ${state.bhk === '1' ? 'selected' : ''}>1 BHK</option><option value="2" ${state.bhk === '2' ? 'selected' : ''}>2 BHK</option><option value="3" ${state.bhk === '3' ? 'selected' : ''}>3 BHK</option><option value="4,5" ${state.bhk === '4,5' ? 'selected' : ''}>4+ BHK</option></select></div>
       <div class="filter"><label for="budget-filter">Maximum budget <span class="filter-value">${money(state.maxBudget)}</span></label><input id="budget-filter" type="range" min="5000000" max="50000000" step="1000000" value="${state.maxBudget}" oninput="updateBudget(this.value)"><div class="range-note"><span>₹50L</span><span>Up to ₹5Cr</span></div></div>
       <div class="filter"><label for="possession-filter">Possession</label><select id="possession-filter" onchange="changeFilter('possessionStatus',this.value)"><option value="">Any possession</option><option value="new_launch" ${state.possessionStatus === 'new_launch' ? 'selected' : ''}>New launch</option><option value="under_construction" ${state.possessionStatus === 'under_construction' ? 'selected' : ''}>Under construction</option><option value="ready_to_move" ${state.possessionStatus === 'ready_to_move' ? 'selected' : ''}>Ready to move</option></select></div>
       <div class="filter"><label for="year-filter">Completion year</label><select id="year-filter" onchange="changeFilter('completionYear',this.value)"><option value="">Any year</option>${Array.from({length: 11}, (_, i) => 2026 + i).map(year => `<option value="${year}" ${state.completionYear === String(year) ? 'selected' : ''}>${year}</option>`).join('')}</select></div>
       <div class="filter"><label for="building-filter">Property category</label><select id="building-filter" onchange="changeFilter('buildingType',this.value)"><option value="1" ${state.buildingType === '1' ? 'selected' : ''}>Residential</option><option value="2" ${state.buildingType === '2' ? 'selected' : ''}>Commercial</option></select></div>
-    </div><div class="filter-bottom live-filter-bottom"><span>${formatFiltersSummary()}</span><div class="filter-controls"><button class="text-button" onclick="clearFilters()">Clear all</button><button class="btn btn-gold" onclick="loadProjects()">APPLY FILTERS</button></div></div></section>
-    <div class="data-source-note"><span class="source-dot"></span> ${state.city === 'Indore' ? 'Indore properties shown here have matching links on property or consultancy sites.' : 'Live project data from Square Yards · Up to 10 results shown.'} RERA numbers/status are not independently verified here.</div>
-    <div class="results-layout live-results"><div class="live-results-main">${state.city === 'Indore' ? indorePartnerSection() : `<div class="results-count">${esc(count)}</div>${resultContent}`}</div><aside class="concierge-box"><div class="eyebrow">A personal touch</div><h3>Need a hand finding home?</h3><p>Tell us what matters to you. Our concierge can help you explore your options.</p><button class="btn btn-gold" onclick="openModal('Talk to a property concierge')">TALK TO A CONCIERGE</button><small>Friendly help, wherever you are.</small></aside></div>
+    </div><div class="filter-bottom live-filter-bottom"><span>${state.recommendationMode ? `${esc(state.city)} · Ranked by property evidence` : formatFiltersSummary()}</span><div class="filter-controls"><button class="text-button" onclick="clearFilters()">Clear all</button><button class="btn ${state.recommendationMode ? 'btn-navy' : 'btn-outline'}" onclick="toggleRecommendations()">${state.recommendationMode ? 'BACK TO ALL PROJECTS' : 'HIGHLY RECOMMENDED'}</button><button class="btn btn-gold" onclick="loadProjects()" ${state.recommendationMode ? 'disabled' : ''}>APPLY FILTERS</button></div></div></section>
+    <div class="data-source-note"><span class="source-dot"></span> Live project data from Square Yards · Showing up to ${MAX_RESULTS} projects per page. Partner and bank references appear on matching project cards. RERA numbers/status are not independently verified here.</div>
+    <div class="results-layout live-results"><div class="live-results-main"><div class="results-count">${esc(count)}</div>${resultContent}</div><aside class="concierge-box"><div class="eyebrow">A personal touch</div><h3>Need a hand finding home?</h3><p>Tell us what matters to you. Our concierge can help you explore your options.</p><button class="btn btn-gold" onclick="openModal('Talk to a property concierge')">TALK TO A CONCIERGE</button><small>Friendly help, wherever you are.</small></aside></div>
     <p class="live-disclaimer">Listings, prices and project details are supplied by Square Yards and may change. Confirm current information with the developer and relevant state RERA authority before making a decision.</p>
   </main>${footer()}`;
+}
+
+function toggleRecommendations() {
+  if (state.recommendationMode) {
+    state.recommendationMode = false;
+    state.recommendationError = '';
+    render();
+    return;
+  }
+  state.recommendationMode = true;
+  loadRecommendations();
+}
+
+async function loadRecommendations() {
+  if (!state.city || state.recommendationLoading) return;
+  state.recommendationMode = true;
+  state.recommendationLoading = true;
+  state.recommendationError = '';
+  render();
+  try {
+    const response = await fetch(`/api/top-properties?city=${encodeURIComponent(state.city)}&limit=20`, { headers: { Accept: 'application/json' } });
+    const payload = await response.json();
+    if (!response.ok || !payload?.ok || !Array.isArray(payload.properties)) {
+      throw new Error(payload?.error || `Recommendation request failed (${response.status}).`);
+    }
+    state.recommendationData = payload;
+  } catch (error) {
+    state.recommendationError = error.message || 'Could not load recommended properties.';
+  } finally {
+    state.recommendationLoading = false;
+    if (location.pathname.startsWith('/real-estate')) render();
+  }
 }
 
 async function mcpCall(name, args) {
@@ -498,7 +703,8 @@ async function mcpCall(name, args) {
   return structured;
 }
 
-async function loadProjects() {
+async function loadProjects(page = 1) {
+  state.page = Math.max(1, Number(page) || 1);
   const thisRequest = ++state.requestNumber;
   state.loading = true;
   state.error = '';
@@ -507,7 +713,7 @@ async function loadProjects() {
     location: state.city,
     maxPrice: Number(state.maxBudget),
     buildingType: state.buildingType,
-    page: 1,
+    page: state.page,
     paging: MAX_RESULTS
   };
   if (state.bhk) args.bhk = state.bhk;
@@ -518,7 +724,7 @@ async function loadProjects() {
     const data = await mcpCall('search_projects', args);
     if (thisRequest !== state.requestNumber) return;
     state.projects = Array.isArray(data.projects) ? data.projects.slice(0, MAX_RESULTS) : [];
-    state.total = Number(data.total || state.projects.length);
+    state.total = Number(data.total ?? data.totalCount ?? data.count ?? state.projects.length);
     state.loaded = true;
     state.loading = false;
     state.error = '';
@@ -537,12 +743,17 @@ async function loadProjects() {
 
 function changeFilter(key, value) {
   state[key] = value;
+  state.page = 1;
+  if (state.recommendationMode) state.recommendationMode = false;
   const summary = document.querySelector('.live-filter-bottom > span');
   if (summary) summary.textContent = formatFiltersSummary();
+  if (location.pathname.startsWith('/real-estate')) render();
 }
 
 function updateBudget(value) {
   state.maxBudget = Number(value);
+  state.page = 1;
+  if (state.recommendationMode) state.recommendationMode = false;
   const label = document.querySelector('.filter-value');
   if (label) label.textContent = money(state.maxBudget);
   const summary = document.querySelector('.live-filter-bottom > span');
@@ -550,22 +761,30 @@ function updateBudget(value) {
 }
 
 function clearFilters() {
-  state.city = 'Indore';
+  state.city = CITIES[0] || '';
   state.bhk = '';
-  state.maxBudget = 25000000;
+  state.maxBudget = 50000000;
   state.possessionStatus = '';
   state.completionYear = '';
   state.buildingType = '1';
   state.query = '';
+  state.page = 1;
   state.error = '';
   state.loaded = false;
+  state.recommendationMode = false;
+  state.recommendationLoading = false;
+  state.recommendationError = '';
   loadProjects();
 }
 
 function searchProperties() {
-  state.city = CITIES.includes(document.getElementById('home-city')?.value) ? document.getElementById('home-city').value : 'Indore';
+  state.city = CITIES.includes(document.getElementById('home-city')?.value) ? document.getElementById('home-city').value : (CITIES[0] || '');
   state.query = document.getElementById('home-search')?.value.trim() || '';
+  state.page = 1;
   state.loaded = false;
+  state.recommendationMode = false;
+  state.recommendationLoading = false;
+  state.recommendationError = '';
   history.pushState({}, '', '/real-estate');
   render();
   window.scrollTo(0, 0);
@@ -681,6 +900,69 @@ async function loadGujaratReraRecord(registrationNumber, projectId) {
   return request;
 }
 
+function infrastructureRecordCard(record) {
+  const source = record.source || {};
+  const sourceLink = /^https?:\/\//i.test(source.url || '')
+    ? `<a href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">View source ↗</a>`
+    : '';
+  const location = record.area_name || (Array.isArray(record.locality_names) ? record.locality_names.join(', ') : '');
+  return `<article class="infrastructure-record"><div class="infrastructure-record-head"><div><h3>${esc(record.project_name || 'Infrastructure project')}</h3><small>${esc([location, record.category, record.program_name].filter(Boolean).join(' · ') || 'Area not specified')}</small></div><span class="infrastructure-status">${esc(record.status_label || record.status_code || 'Status not stated')}</span></div>${record.description ? `<p>${esc(record.description)}</p>` : ''}<div class="infrastructure-record-source"><span>${esc([source.title, record.source_reference].filter(Boolean).join(' · ') || 'Source not specified')}</span>${sourceLink}</div></article>`;
+}
+
+function cityInfrastructureSection(projectId, city = '') {
+  const data = infrastructureCache.get(String(projectId));
+  const error = infrastructureErrors.get(String(projectId));
+  const counts = data?.counts || {};
+  const groups = [
+    ['locality_matches', 'Projects naming this locality'],
+    ['area_based_context', 'Area based context'],
+    ['citywide_context', 'Citywide projects'],
+    ['unlocated_proposals', 'Projects without a named area']
+  ];
+  const content = error
+    ? `<div class="infrastructure-api-error"><p>${esc(error)}</p><button class="btn btn-outline" onclick="retryCityInfrastructure('${esc(projectId)}')">TRY AGAIN</button></div>`
+    : !data
+      ? '<div class="infrastructure-api-loading"><span class="loader"></span><span>Loading sourced infrastructure projects for this locality…</span></div>'
+      : groups.map(([key, title]) => {
+        const records = Array.isArray(data[key]) ? data[key] : [];
+        if (!records.length) return '';
+        return `<section class="infrastructure-group"><h3>${esc(title)} <span>${esc(counts[key] ?? records.length)}</span></h3>${records.map(infrastructureRecordCard).join('')}</section>`;
+      }).join('') || '<p class="infrastructure-empty">No infrastructure records were returned for this project.</p>';
+  const noLocalityMatch = data && Number(counts.locality_matches || 0) === 0
+    ? '<p class="infrastructure-match-note">No source explicitly names this project’s locality. Area based, citywide, and unlocated records are shown separately and should not be read as nearby projects.</p>'
+    : '';
+  return `<section class="detail-section infrastructure-section"><div class="eyebrow">Locality context · ${esc(city)}</div><h2>Infrastructure projects</h2><p class="section-intro">Sourced plans and projects are matched against the property locality by named-area text. This is not a distance calculation.</p>${content}${noLocalityMatch}${data?.data_note ? `<p class="infrastructure-data-note">${esc(data.data_note)}</p>` : ''}</section>`;
+}
+
+async function loadCityInfrastructure(projectId) {
+  const key = String(projectId);
+  if (infrastructureCache.has(key)) return infrastructureCache.get(key);
+  if (infrastructureRequests.has(key)) return infrastructureRequests.get(key);
+  infrastructureErrors.delete(key);
+  const request = ensureProjectRecord(key).then(saved => {
+    if (!saved) throw new Error(projectRecordErrors.get(key) || 'Could not prepare this project for the infrastructure lookup.');
+    return fetch(`/api/infrastructure-projects?project_id=${encodeURIComponent(key)}`, { headers: { Accept: 'application/json' } });
+  }).then(async response => {
+    const payload = await response.json();
+    if (!response.ok || payload?.ok === false) throw new Error(payload?.error || `Infrastructure API returned HTTP ${response.status}.`);
+    infrastructureCache.set(key, payload);
+    return payload;
+  }).catch(error => {
+    infrastructureErrors.set(key, error.message || 'Could not load infrastructure project data.');
+  }).finally(() => {
+    infrastructureRequests.delete(key);
+    if (location.pathname.startsWith(`/property/${key}`)) render();
+  });
+  infrastructureRequests.set(key, request);
+  return request;
+}
+
+function retryCityInfrastructure(projectId) {
+  infrastructureErrors.delete(String(projectId));
+  loadCityInfrastructure(projectId);
+  render();
+}
+
 function propertyDetails() {
   const rawId = decodeURIComponent(location.pathname.split('/').pop() || '');
   const id = rawId.split('-')[0];
@@ -791,9 +1073,12 @@ function propertyDetails() {
         : '<section class="detail-section developer-profile-section"><div class="eyebrow">Builder profile</div><h2>Developer details</h2><p>This project response did not include a developer ID, so a developer profile could not be matched safely.</p></section>';
 
   const description = plainText(project.description);
-  const appreciationSection = isIndoreProject ? `${indoreAppreciationSection(id, name)}${indoreFinanceSection(id)}` : '';
+  const hasSupportedCity = Boolean(city || card?.city || state.city);
+  const displayCity = city || card?.city || state.city;
+  const appreciationSection = hasSupportedCity ? `${cityAppreciationSection(id, name, displayCity)}${cityFinanceSection(id)}` : '';
+  const infrastructureSection = hasSupportedCity ? cityInfrastructureSection(id, displayCity) : '';
   const detailsContent = cached
-    ? `${appreciationSection}<section class="detail-section live-project-overview"><div class="eyebrow">Project snapshot</div><h2>Key details for your decision</h2><div class="live-detail-grid"><div><small>Location</small><b>${esc([locality, region, city].filter(Boolean).join(', ') || 'Not listed')}</b></div><div><small>Construction status</small><b>${esc(status || 'Not listed')}${project.projectStatusPer ? ` · ${esc(project.projectStatusPer)} complete` : ''}</b></div><div><small>Expected possession</small><b>${esc(project.possessionStartingFrom || 'Not listed')}</b></div><div><small>Configurations</small><b>${esc(beds)}</b></div><div><small>Project size</small><b>${project.projectArea ? `${esc(project.projectArea)} acres` : 'Not listed'}</b></div><div><small>Total units</small><b>${esc(project.totalUnits || card?.totalUnits || 'Not listed')}</b></div><div><small>Area range</small><b>${project.minSize && project.maxSize ? `${esc(project.minSize)}–${esc(project.maxSize)} sq.ft. (${esc(project.unitMinCatName || project.areaUnit || 'area')})` : 'See unit options below'}</b></div><div><small>Indicative price range</small><b>${esc(price)}</b></div></div>${description ? `<details class="project-description"><summary>Read project description</summary><p>${esc(description.slice(0, 1800))}${description.length > 1800 ? '…' : ''}</p></details>` : ''}</section>
+    ? `${appreciationSection}${infrastructureSection}<section class="detail-section live-project-overview"><div class="eyebrow">Project snapshot</div><h2>Key details for your decision</h2><div class="live-detail-grid"><div><small>Location</small><b>${esc([locality, region, city].filter(Boolean).join(', ') || 'Not listed')}</b></div><div><small>Construction status</small><b>${esc(status || 'Not listed')}${project.projectStatusPer ? ` · ${esc(project.projectStatusPer)} complete` : ''}</b></div><div><small>Expected possession</small><b>${esc(project.possessionStartingFrom || 'Not listed')}</b></div><div><small>Configurations</small><b>${esc(beds)}</b></div><div><small>Project size</small><b>${project.projectArea ? `${esc(project.projectArea)} acres` : 'Not listed'}</b></div><div><small>Total units</small><b>${esc(project.totalUnits || card?.totalUnits || 'Not listed')}</b></div><div><small>Area range</small><b>${project.minSize && project.maxSize ? `${esc(project.minSize)}–${esc(project.maxSize)} sq.ft. (${esc(project.unitMinCatName || project.areaUnit || 'area')})` : 'See unit options below'}</b></div><div><small>Indicative price range</small><b>${esc(price)}</b></div></div>${description ? `<details class="project-description"><summary>Read project description</summary><p>${esc(description.slice(0, 1800))}${description.length > 1800 ? '…' : ''}</p></details>` : ''}</section>
       <section class="detail-section live-rera-section"><div class="eyebrow">Registration information</div><h2>RERA project records</h2>${reraBlock}<p class="live-disclaimer">These RERA details are supplied by Square Yards and have not been independently checked against the state authority’s register. Match the registration number, project/phase name, promoter and dates on the official RERA site.</p></section>
       ${mpReraVerification}
       ${rajasthanReraVerification}
@@ -807,6 +1092,8 @@ function propertyDetails() {
       : `<div class="api-state loading-state"><span class="loader"></span><div><b>Loading project details</b><p>Fetching project, RERA and nearby landmark details from Square Yards…</p></div></div>`;
 
   if (!cached && !detailRequests.has(id)) queueMicrotask(() => loadProjectDetails(id));
+  if (cached && !projectRecordCache.has(id) && !projectRecordRequests.has(id) && !projectRecordErrors.has(id)) queueMicrotask(() => ensureProjectRecord(id));
+  if (cached && hasSupportedCity && !infrastructureCache.has(id) && !infrastructureRequests.has(id) && !infrastructureErrors.has(id)) queueMicrotask(() => loadCityInfrastructure(id));
   if (cached && developerId && !developerDetailsCache.has(developerId) && !developerRequests.has(developerId) && !developerErrors.has(developerId)) queueMicrotask(() => loadDeveloperDetails(id, developerId));
   if (cached && isIndoreProject) mpReraNumbers.forEach(number => { if (!mpReraCache.has(number.toUpperCase()) && !mpReraRequests.has(number.toUpperCase()) && !mpReraErrors.has(number.toUpperCase())) queueMicrotask(() => loadMpReraRecord(number, id)); });
   if (cached && isJaipurProject) rajasthanReraNumbers.forEach(number => { if (!rajasthanReraCache.has(number.toUpperCase()) && !rajasthanReraRequests.has(number.toUpperCase()) && !rajasthanReraErrors.has(number.toUpperCase())) queueMicrotask(() => loadRajasthanReraRecord(number, id)); });
@@ -842,6 +1129,7 @@ async function loadProjectDetails(id) {
     .then(data => {
       projectDetailsCache.set(id, data);
       state.error = '';
+      return ensureProjectRecord(id);
     })
     .catch(error => {
       state.error = error.message || 'Please try again.';
@@ -851,6 +1139,45 @@ async function loadProjectDetails(id) {
       if (location.pathname.startsWith(`/property/${id}`)) render();
     });
   detailRequests.set(id, request);
+  return request;
+}
+
+async function ensureProjectRecord(id, retry = false) {
+  const key = String(id);
+  if (projectRecordCache.has(key)) return projectRecordCache.get(key);
+  if (projectRecordRequests.has(key)) return projectRecordRequests.get(key);
+  if (retry) projectRecordErrors.delete(key);
+  const cached = projectDetailsCache.get(key);
+  const detail = cached?.detail || cached || {};
+  const project = detail.projectData || cached?.projectData || {};
+  const card = state.projects.find(item => String(item.id) === key) || {};
+  const name = project.projectName || project.name || detail.name || card.name;
+  const city = project.city || detail.city || card.city || state.city;
+  const locality = project.subLocation || project.locality || card.locality || (project.location && project.location !== city ? project.location : card.location) || '';
+  if (!name || !city) {
+    projectRecordErrors.set(key, 'Square Yards did not return a project name and city to save.');
+    return Promise.resolve();
+  }
+  const request = fetch('/api/ensure-project', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ project_id: key, project_name: name, city, locality })
+  })
+    .then(async response => {
+      const payload = await response.json();
+      if (!response.ok || !payload?.ok) throw new Error(payload?.error || `Project lookup failed (${response.status}).`);
+      projectRecordCache.set(key, payload);
+      projectRecordErrors.delete(key);
+      return payload;
+    })
+    .catch(error => {
+      projectRecordErrors.set(key, error.message || 'Could not check the project table.');
+    })
+    .finally(() => {
+      projectRecordRequests.delete(key);
+      if (location.pathname.startsWith(`/property/${key}`)) render();
+    });
+  projectRecordRequests.set(key, request);
   return request;
 }
 
@@ -939,5 +1266,23 @@ function toast(message) {
 }
 
 window.addEventListener('popstate', render);
-window.addEventListener('DOMContentLoaded', render);
-render();
+
+async function initializeCitiesAndRender() {
+  try {
+    const response = await fetch('/api/cities', { headers: { Accept: 'application/json' } });
+    const payload = await response.json();
+    if (!response.ok || !payload?.ok || !Array.isArray(payload.cities)) {
+      throw new Error(payload?.error || `Could not load cities (${response.status}).`);
+    }
+    CITIES = [...new Set(payload.cities.map(city => String(city || '').trim()).filter(Boolean))];
+    if (!CITIES.length) throw new Error('No cities are in the projects table yet. Import a city project catalog first.');
+    if (!CITIES.includes(state.city)) state.city = CITIES[0];
+  } catch (error) {
+    CITIES = [];
+    state.city = '';
+    state.error = error.message || 'Could not load available cities.';
+  }
+  render();
+}
+
+initializeCitiesAndRender();

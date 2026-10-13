@@ -21,6 +21,11 @@
 .live-results-main{min-width:0}
 .results-count{color:var(--muted);font-size:11px;margin:0 0 12px}
 .live-property-card{min-width:0}
+.filter-controls{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.filter-controls .btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.recommendation-intro span{color:var(--muted);font-size:10px;line-height:1.5}
+.recommendation-intro{display:grid;gap:4px;margin:0 0 14px;padding:13px 15px;background:#fff;border:1px solid var(--line);border-radius:5px}
+.recommendation-intro b{font:700 13px Manrope,sans-serif;color:var(--navy)}
 .live-property-card .property-image img{object-fit:cover}
 .live-property-card .property-image .image-unavailable,.detail-photo .image-unavailable,.live-property-card .property-image.image-unavailable,.detail-photo.image-unavailable,.partner-property-card .property-image .image-unavailable,.partner-property-card .property-image.image-unavailable{width:100%;height:100%;background:linear-gradient(135deg,#e7e2d7,#d5ddd7 52%,#bcc8c0);display:grid;place-items:center}
 .live-property-card .property-image .image-unavailable:after,.detail-photo .image-unavailable:after,.live-property-card .property-image.image-unavailable:after,.detail-photo.image-unavailable:after{content:'Project image unavailable';font-size:11px;color:#52606d;background:#ffffffd9;padding:8px 12px;border-radius:4px}
@@ -213,12 +218,15 @@
 .appreciation-chart-heading small{margin-top:4px;color:var(--muted);font-size:10px}
 .appreciation-legend{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:10px;white-space:nowrap}
 .appreciation-legend i{width:9px;height:9px;border-radius:50%;background:#3476cf;display:inline-block}
+.appreciation-legend .legend-max{margin-left:8px;background:#bd8a2e}
 .appreciation-chart-scroll{overflow-x:auto}
 .appreciation-chart{display:block;width:100%;min-width:570px;height:auto;overflow:visible}
 .trend-gridline{stroke:#e8e6e1;stroke-width:1}
 .trend-axis-label{fill:#667386;font:10px 'DM Sans',sans-serif}
 .trend-line{fill:none;stroke:#3476cf;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.trend-line-max{stroke:#bd8a2e;stroke-dasharray:7 5;stroke-width:2.5}
 .trend-marker{fill:#3476cf;stroke:#fff;stroke-width:2}
+.trend-max-marker{fill:#bd8a2e;stroke:#fff;stroke-width:2}
 .appreciation-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:12px 0}
 .appreciation-metrics>div{padding:12px;border:1px solid var(--line);border-radius:5px;background:#faf9f6;min-width:0}
 .appreciation-metrics small,.appreciation-metrics b,.appreciation-metrics span{display:block}
@@ -235,6 +243,9 @@
 .appreciation-source>span{width:17px;height:17px;display:grid;place-items:center;flex:none;border-radius:50%;background:#efe4c9;color:#806125;font:700 10px Manrope,sans-serif}
 .appreciation-source p{font-size:9px;line-height:1.6;color:#636b76;margin:0}
 .appreciation-source a{color:var(--gold-dark);font-weight:700;white-space:nowrap}
+.appreciation-api-loading{display:flex;align-items:center;gap:12px;min-height:100px;padding:18px;border:1px solid var(--line);border-radius:5px;color:var(--muted);font-size:12px}
+.appreciation-api-error{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px;border:1px solid #e8c9bd;border-radius:5px;background:#fff8f5;color:#7c3322;font-size:12px}
+.appreciation-api-error p{margin:0}
 /* Indore bank finance references */
 .finance-section{padding:22px;background:#fff;border:1px solid var(--line);border-radius:7px}
 .finance-section h2{font-size:25px;letter-spacing:-.6px;margin:10px 0}
@@ -263,9 +274,32 @@
 .finance-sources-note b{color:var(--ink)}
 .finance-sources-note a{color:var(--gold-dark);font-weight:700;text-decoration:none}
 .finance-section .partner-section-note{margin-top:13px}
+.finance-api-json{margin-top:16px;border:1px solid var(--line);border-radius:6px;background:#faf9f6}
+.finance-api-json summary{padding:11px 13px;cursor:pointer;color:var(--navy);font-size:12px;font-weight:700}
+.finance-api-json pre{max-height:420px;overflow:auto;margin:0;padding:13px;border-top:1px solid var(--line);white-space:pre-wrap;overflow-wrap:anywhere;color:var(--navy);font:11px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}
 @media(max-width:760px){.finance-project-grid{grid-template-columns:1fr}}
 @media(max-width:460px){.finance-section{padding:16px}.finance-project-head{align-items:flex-start}.finance-project-head .btn{font-size:7px;padding:8px}.finance-bank-row{grid-template-columns:30px minmax(0,1fr)}.finance-bank-row>a{grid-column:2;justify-self:start}.finance-project-foot{align-items:flex-start;flex-direction:column}}
 @media(max-width:900px){.partner-property-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.partner-source-grid{grid-template-columns:1fr}}
 @media(max-width:460px){.partner-listings-section,.partner-detail-section{padding:16px}.partner-property-grid{grid-template-columns:1fr}.partner-property-card .card-actions{flex-direction:row}.partner-property-card .card-actions .btn{font-size:9px}.partner-listings-section h2{font-size:21px}}
-@media(max-width:600px){.appreciation-section{padding:16px}.appreciation-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.appreciation-chart-card{padding:12px 10px 8px}.appreciation-chart-heading{align-items:flex-start}.appreciation-source a{white-space:normal}}
+@media(max-width:600px){.appreciation-section{padding:16px}.appreciation-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.appreciation-chart-card{padding:12px 10px 8px}.appreciation-chart-heading{align-items:flex-start}.appreciation-source a{white-space:normal}.appreciation-legend{flex-wrap:wrap;justify-content:flex-end}.appreciation-api-error{align-items:flex-start;flex-direction:column}}
+/* Indore infrastructure projects */
+.infrastructure-section{padding:22px;background:#fff;border:1px solid var(--line);border-radius:7px}
+.infrastructure-section h2{font-size:25px;letter-spacing:-.6px;margin:10px 0}
+.infrastructure-api-loading{display:flex;align-items:center;gap:12px;min-height:90px;padding:18px;border:1px solid var(--line);border-radius:5px;color:var(--muted);font-size:12px}
+.infrastructure-api-error{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px;border:1px solid #e8c9bd;border-radius:5px;background:#fff8f5;color:#7c3322;font-size:12px}
+.infrastructure-api-error p{margin:0}
+.infrastructure-group{margin-top:18px}
+.infrastructure-group>h3{display:flex;justify-content:space-between;align-items:center;gap:12px;font:700 13px Manrope,sans-serif;margin:0 0 9px}
+.infrastructure-group>h3 span{display:grid;place-items:center;min-width:25px;height:23px;padding:0 6px;border-radius:20px;background:#f0eee8;color:var(--gold-dark);font:700 10px 'DM Sans',sans-serif}
+.infrastructure-record{padding:13px 14px;margin:8px 0;border:1px solid var(--line);border-radius:5px;background:#fff}
+.infrastructure-record-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.infrastructure-record-head h3{font:700 12px Manrope,sans-serif;margin:0}
+.infrastructure-record-head small{display:block;margin-top:5px;font-size:9px;color:var(--muted);line-height:1.5}
+.infrastructure-status{flex:none;padding:5px 7px;border-radius:3px;background:#f6f1e6;color:#806222;font-size:8px;font-weight:700;max-width:42%;text-align:right}
+.infrastructure-record>p{margin:9px 0;font-size:10px;line-height:1.6;color:#5f6977}
+.infrastructure-record-source{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;border-top:1px solid #efeee9;padding-top:8px;color:var(--muted);font-size:8px;line-height:1.5}
+.infrastructure-record-source a{flex:none;color:var(--gold-dark);font-weight:700;text-decoration:none}
+.infrastructure-match-note,.infrastructure-data-note,.infrastructure-empty{padding:11px 13px;margin:12px 0 0;border:1px solid #e8e0ce;border-radius:5px;background:#faf7ef;color:var(--muted);font-size:9px;line-height:1.6}
+.live-pagination{align-items:center;flex-wrap:wrap;margin:22px 0;gap:8px}.live-pagination .page:disabled{opacity:.45;cursor:not-allowed}.pagination-summary,.page-number{font-size:11px;color:var(--muted);margin:0 5px}
+@media(max-width:600px){.infrastructure-section{padding:16px}.infrastructure-record-head{flex-direction:column}.infrastructure-status{max-width:100%;text-align:left}.infrastructure-record-source{flex-direction:column}.infrastructure-api-error{align-items:flex-start;flex-direction:column}}
